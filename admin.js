@@ -337,6 +337,7 @@ function loadAdminData() {
       <div>
         <button class="btn btn-sm btn-edit" data-id="${p.id}">✏️</button>
         <button class="btn btn-sm btn-danger btn-delete" data-id="${p.id}">🗑️</button>
+        <button class="btn btn-sm btn-danger btn-delete-published" data-id="${p.id}" title="Eliminar publicado">🗑️ Publicado</button>
       </div>
     </li>
   `).join('');
@@ -351,6 +352,8 @@ function loadAdminData() {
       editProduct(parseInt(id));
     } else if (btn.classList.contains('btn-delete')) {
       deleteProduct(parseInt(id));
+    } else if (btn.classList.contains('btn-delete-published')) {
+      deletePublishedProduct(parseInt(id));
     }
   };
 }
@@ -559,6 +562,41 @@ async function publishToGitHub() {
     btn.textContent = '📤 Publicar en GitHub';
   }
 }
+
+// Eliminar producto publicado (requiere autenticación admin)
+async function deletePublishedProduct(id) {
+  if (!confirm('¿Eliminar este producto publicado de GitHub y del sitio? Esta acción es irreversible.')) return;
+  const btn = document.querySelector(`[data-id="${id}"]`);
+  try {
+    showNotification('⏳ Eliminando producto publicado...', 'info');
+    const resp = await fetch('/admin/delete', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-admin-pass': window._adminPass || '' },
+      body: JSON.stringify({ id })
+    });
+
+    if (!resp.ok) {
+      const txt = await resp.text();
+      throw new Error(txt || 'Delete failed');
+    }
+
+    showNotification('✅ Producto publicado eliminado', 'success');
+
+    // Remove from localStorage and UI
+    let products = JSON.parse(localStorage.getItem('adminProducts') || '[]');
+    const updated = products.filter(p => p.id != id);
+    localStorage.setItem('adminProducts', JSON.stringify(updated));
+    window.productsData = updated;
+    loadAdminData();
+    if (window.renderCatalog) window.renderCatalog();
+  } catch (err) {
+    console.error('deletePublishedProduct error:', err);
+    showNotification(`❌ Error: ${err.message}`, 'error');
+  }
+}
+
+// Exponer para pruebas/console
+window.deletePublishedProduct = deletePublishedProduct;
 
 // ============ INICIALIZAR ============
 window.openAdminPanel = function() {
