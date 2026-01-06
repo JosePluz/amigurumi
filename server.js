@@ -1,14 +1,20 @@
 /**
- * Servidor Express para Render
+ * Servidor Express para Render (ESM)
  * Sirve la aplicación estática con middlewares optimizados
  */
 
-const express = require('express');
-const path = require('path');
-const compression = require('compression');
-const helmet = require('helmet');
-const cors = require('cors');
-require('dotenv').config();
+import express from 'express';
+import path from 'path';
+import compression from 'compression';
+import helmet from 'helmet';
+import cors from 'cors';
+import 'dotenv/config';
+import { readFile } from 'fs/promises';
+import { fileURLToPath } from 'url';
+import { dirname as pathDirname, join } from 'path';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = pathDirname(__filename);
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -85,26 +91,28 @@ app.get('/api/health', (req, res) => {
   });
 });
 
+async function loadProducts() {
+  try {
+    const file = join(__dirname, 'data', 'products.json');
+    const content = await readFile(file, 'utf-8');
+    const parsed = JSON.parse(content);
+    return parsed.products || [];
+  } catch (err) {
+    console.error('Error cargando products.json:', err);
+    return [];
+  }
+}
+
 /**
  * GET /api/products
- * Retorna los productos (desde products.js)
+ * Retorna los productos (desde data/products.json)
  */
-app.get('/api/products', (req, res) => {
+app.get('/api/products', async (req, res) => {
   try {
-    // Leer dinámicamente para actualizaciones en tiempo real
-    delete require.cache[require.resolve('./products.js')];
-    const { products } = require('./products.js');
-    
-    res.json({
-      success: true,
-      count: products.length,
-      data: products
-    });
+    const products = await loadProducts();
+    res.json({ success: true, count: products.length, data: products });
   } catch (error) {
-    res.status(500).json({
-      success: false,
-      error: 'No se pudieron cargar los productos'
-    });
+    res.status(500).json({ success: false, error: 'No se pudieron cargar los productos' });
   }
 });
 
@@ -112,28 +120,14 @@ app.get('/api/products', (req, res) => {
  * GET /api/products/:id
  * Retorna un producto específico
  */
-app.get('/api/products/:id', (req, res) => {
+app.get('/api/products/:id', async (req, res) => {
   try {
-    delete require.cache[require.resolve('./products.js')];
-    const { products } = require('./products.js');
+    const products = await loadProducts();
     const product = products.find(p => p.id == req.params.id);
-    
-    if (!product) {
-      return res.status(404).json({
-        success: false,
-        error: 'Producto no encontrado'
-      });
-    }
-    
-    res.json({
-      success: true,
-      data: product
-    });
+    if (!product) return res.status(404).json({ success: false, error: 'Producto no encontrado' });
+    res.json({ success: true, data: product });
   } catch (error) {
-    res.status(500).json({
-      success: false,
-      error: 'Error al obtener el producto'
-    });
+    res.status(500).json({ success: false, error: 'Error al obtener el producto' });
   }
 });
 
