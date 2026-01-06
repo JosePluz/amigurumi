@@ -25,7 +25,7 @@ const process = globalThis.process || { env: {} };
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'admin2024'; // CAMBIAR EN RENDER
 const GITHUB_API = 'https://api.github.com';
 const REPO_OWNER = process.env.REPO_OWNER || 'JosePluz';
-const REPO_NAME = process.env.REPO_NAME || 'amigurumis';
+const REPO_NAME = process.env.REPO_NAME || 'amigurumi';
 
 // Validación de entrada
 const VALIDATION_RULES = {
@@ -58,37 +58,39 @@ function showLoginModal() {
   const loginBtn = document.getElementById('loginBtn');
   const loginPass = document.getElementById('loginPass');
   
-  const attemptLogin = () => {
+  const attemptLogin = async () => {
     const pass = loginPass.value.trim();
     
     if (!pass) {
       showNotification('⚠️ Ingresa la contraseña', 'error');
       return;
     }
-    // Validar contra servidor (preferido)
-    fetch('/admin/auth', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ password: pass })
-    }).then(r => {
-      if (r.ok) return r.json();
-      throw new Error('Unauthorized');
-    }).then(() => {
-      window._adminPass = pass;
-      document.getElementById('loginModal').remove();
-      showAdminPanel();
-    }).catch(() => {
-      // Fallback local check
-      if (pass === ADMIN_PASSWORD) {
-        window._adminPass = pass;
-        document.getElementById('loginModal').remove();
-        showAdminPanel();
-      } else {
-        showNotification('❌ Contraseña incorrecta', 'error');
-        loginPass.value = '';
-        loginPass.focus();
+    
+    // Validar contra servidor (SIEMPRE)
+    try {
+      const r = await fetch('/admin/auth', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ password: pass })
+      });
+      
+      if (r.ok) {
+        const data = await r.json();
+        if (data.success) {
+          window._adminPass = pass;
+          document.getElementById('loginModal').remove();
+          showAdminPanel();
+          return;
+        }
       }
-    });
+      
+      // Si falla en servidor, mostrar error
+      showNotification('❌ Contraseña incorrecta', 'error');
+      loginPass.value = '';
+      loginPass.focus();
+    } catch (err) {
+      showNotification(`❌ Error de conexión: ${err.message}`, 'error');
+    }
   };
   
   loginBtn.onclick = attemptLogin;
@@ -453,38 +455,63 @@ async function saveProduct() {
 }
 
 function editProduct(id) {
-  const products = JSON.parse(localStorage.getItem('adminProducts') || '[]');
-  const product = products.find(p => p.id === id);
-  if (!product) return;
-  
-  document.getElementById('editId').value = product.id;
-  document.getElementById('prodName').value = product.name;
-  document.getElementById('prodDesc').value = product.desc;
-  document.getElementById('prodPrice').value = product.price;
-  document.getElementById('prodWidth').value = product.size.width;
-  document.getElementById('prodHeight').value = product.size.height;
-  
-  // Actualizar contadores
-  document.querySelector('[data-field="prodName"]').textContent = `${product.name.length}/100`;
-  document.querySelector('[data-field="prodDesc"]').textContent = `${product.desc.length}/500`;
-  
-  window.scrollTo(0, 0);
-  document.getElementById('prodName').focus();
+  try {
+    console.log('editProduct called with id:', id);
+    const products = JSON.parse(localStorage.getItem('adminProducts') || '[]');
+    const product = products.find(p => p.id == id);
+    if (!product) {
+      console.warn('Producto no encontrado para editar:', id);
+      showNotification('❌ Producto no encontrado', 'error');
+      return;
+    }
+    
+    document.getElementById('editId').value = product.id;
+    document.getElementById('prodName').value = product.name;
+    document.getElementById('prodDesc').value = product.desc;
+    document.getElementById('prodPrice').value = product.price;
+    document.getElementById('prodWidth').value = product.size?.width || 15;
+    document.getElementById('prodHeight').value = product.size?.height || 20;
+    
+    // Actualizar contadores
+    const nameCounter = document.querySelector('[data-field="prodName"]');
+    const descCounter = document.querySelector('[data-field="prodDesc"]');
+    if (nameCounter) nameCounter.textContent = `${product.name.length}/100`;
+    if (descCounter) descCounter.textContent = `${product.desc.length}/500`;
+    
+    window.scrollTo(0, 0);
+    document.getElementById('prodName').focus();
+    showNotification('✏️ Editando producto', 'info');
+  } catch (err) {
+    console.error('editProduct error:', err);
+    showNotification(`❌ Error al editar: ${err.message}`, 'error');
+  }
 }
 
 function deleteProduct(id) {
-  const products = JSON.parse(localStorage.getItem('adminProducts') || '[]');
-  const product = products.find(p => p.id === id);
-  
-  if (!confirm(`¿Eliminar "${escapeHtml(product?.name || 'producto')}"?`)) return;
-  
-  const updated = products.filter(p => p.id !== id);
-  localStorage.setItem('adminProducts', JSON.stringify(updated));
-  window.productsData = updated;
-  
-  loadAdminData();
-  if (window.renderCatalog) window.renderCatalog();
-  showNotification('🗑️ Producto eliminado', 'success');
+  try {
+    console.log('deleteProduct called with id:', id);
+    const products = JSON.parse(localStorage.getItem('adminProducts') || '[]');
+    const product = products.find(p => p.id == id);
+    
+    if (!product) {
+      console.warn('Producto no encontrado para eliminar:', id);
+      showNotification('❌ Producto no encontrado', 'error');
+      return;
+    }
+    
+    if (!confirm(`¿Eliminar "${escapeHtml(product.name || 'producto')}"?`)) return;
+    
+    const updated = products.filter(p => p.id != id);
+    localStorage.setItem('adminProducts', JSON.stringify(updated));
+    window.productsData = updated;
+    
+    loadAdminData();
+    if (window.renderCatalog) window.renderCatalog();
+    showNotification('🗑️ Producto eliminado', 'success');
+  } catch (err) {
+    console.error('deleteProduct error:', err);
+    showNotification(`❌ Error al eliminar: ${err.message}`, 'error');
+  }
 }
 
 function clearForm() {
