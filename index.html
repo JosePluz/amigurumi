@@ -67,6 +67,12 @@
   <script src="updater.js?v=2.0" defer></script>
 
   <script>
+    // Fallbacks para evitar ReferenceError si admin/modulo no se ha cargado aún
+    window.editProduct = window.editProduct || function(id){ console.warn('editProduct not ready', id); };
+    window.deleteProduct = window.deleteProduct || function(id){ console.warn('deleteProduct not ready', id); };
+  </script>
+
+  <script>
     // Cargar datos admin en memoria y manejar click admin de forma robusta
     document.addEventListener('DOMContentLoaded', () => {
       window.productsData = JSON.parse(localStorage.getItem('adminProducts') || '[]');
