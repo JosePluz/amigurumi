@@ -228,13 +228,14 @@ function showAdminPanel() {
             </div>
 
             <label>
-              📸 Imagen (JPG, PNG, WEBP)
+              📸 Imágenes (JPG, PNG, WEBP) — Puedes seleccionar varias
               <input 
                 id="prodImage" 
                 type="file" 
                 accept="image/jpeg,image/png,image/webp"
+                multiple
               />
-              <small>Tamaño máximo: 5MB</small>
+              <small>Tamaño máximo por imagen: 5MB</small>
             </label>
 
             <div class="admin-form__actions">
@@ -331,7 +332,7 @@ function saveProduct() {
   const price = parseFloat(document.getElementById('prodPrice').value);
   const width = parseInt(document.getElementById('prodWidth').value) || 15;
   const height = parseInt(document.getElementById('prodHeight').value) || 20;
-  const imageFile = document.getElementById('prodImage').files[0];
+  const imageFiles = Array.from(document.getElementById('prodImage').files || []);
   
   // Validar
   const nameVal = validateInput('name', name);
@@ -346,33 +347,51 @@ function saveProduct() {
     return;
   }
   
-  // Validar imagen
-  let imagePath = null;
-  if (imageFile) {
-    // Validar tipo
-    if (!['image/jpeg', 'image/png', 'image/webp'].includes(imageFile.type)) {
-      showNotification('❌ Solo JPG, PNG o WEBP', 'error');
-      return;
+  // Validar y procesar imágenes (pueden ser múltiples)
+  let imgs = [];
+  let imgsData = []; // almacenará dataURLs para publicar
+
+  if (imageFiles.length > 0) {
+    // Validar cada archivo
+    for (const f of imageFiles) {
+      if (!['image/jpeg', 'image/png', 'image/webp'].includes(f.type)) {
+        showNotification('❌ Solo JPG, PNG o WEBP', 'error');
+        return;
+      }
+      if (f.size > 5 * 1024 * 1024) {
+        showNotification('❌ Cada imagen debe ser < 5MB', 'error');
+        return;
+      }
     }
-    // Validar tamaño (5MB)
-    if (imageFile.size > 5 * 1024 * 1024) {
-      showNotification('❌ Imagen debe ser < 5MB', 'error');
-      return;
+
+    // Leer archivos como dataURL
+    const readFile = (file) => new Promise((res, rej) => {
+      const reader = new FileReader();
+      reader.onload = () => res(reader.result);
+      reader.onerror = rej;
+      reader.readAsDataURL(file);
+    });
+
+    for (const f of imageFiles) {
+      // Normalizar nombre
+      const nameClean = f.name.replace(/\s+/g, '-');
+      imgs.push(`img/${nameClean}`);
+      const dataUrl = await readFile(f);
+      imgsData.push({ name: `img/${nameClean}`, dataUrl });
     }
-    imagePath = `img/${imageFile.name.replace(/\s+/g, '-')}`;
   } else if (id) {
-    // Si estamos editando y sin nueva imagen, mantener la antigua
+    // Si editando y sin nuevas imágenes, mantener las antiguas
     const existingProduct = (window.productsData || []).find(p => p.id == id);
-    if (existingProduct?.imgs?.[0]) {
-      imagePath = existingProduct.imgs[0];
+    if (existingProduct?.imgs && existingProduct.imgs.length > 0) {
+      imgs = existingProduct.imgs.slice();
     }
   }
-  
-  if (!imagePath) {
-    showNotification('❌ Debes seleccionar una imagen', 'error');
+
+  if (imgs.length === 0) {
+    showNotification('❌ Debes seleccionar al menos una imagen', 'error');
     return;
   }
-  
+
   // Crear producto
   const product = {
     id: id ? parseInt(id) : Date.now(),
@@ -380,7 +399,8 @@ function saveProduct() {
     desc: escapeHtml(desc),
     price: Math.round(price * 100) / 100,
     size: { width: Math.max(1, width), height: Math.max(1, height) },
-    imgs: [imagePath]
+    imgs,
+    imgsData // dataURLs para publicar a GitHub
   };
   
   // Guardar en localStorage
@@ -475,55 +495,86 @@ async function publishToGitHub() {
       showNotification('⚠️ No hay productos para publicar', 'info');
       throw new Error('Empty products');
     }
-    
-    // Generar contenido del archivo
-    const content = `/**
- * Catálogo de Productos - Amigurumis
- * Generado: ${new Date().toLocaleString()}
- * Total productos: ${products.length}
- */
-
-export const products = ${JSON.stringify(products, null, 2)};
-`;
-    
-    // Obtener SHA del archivo actual
-    const getResp = await fetch(
-      `${GITHUB_API}/repos/${REPO_OWNER}/${REPO_NAME}/contents/products.js`,
-      { 
+    // Primero subir imágenes (si existen) usando la API de contenidos
+    async function uploadFileToRepo(path, base64Content, token, message) {
+      // Revisar si el archivo ya existe para obtener sha
+      let sha = null;
+      const getR = await fetch(`${GITHUB_API}/repos/${REPO_OWNER}/${REPO_NAME}/contents/${path}`, {
         headers: { 'Authorization': `token ${token}` }
+      });
+      if (getR.ok) {
+        const d = await getR.json();
+        sha = d.sha;
       }
-    );
-    
-    if (!getResp.ok) {
-      throw new Error(`Acceso al repo: ${getResp.status}. Verifica el token y repo.`);
-    }
-    
-    const fileData = await getResp.json();
-    const sha = fileData.sha;
-    
-    // Hacer commit
-    const updateResp = await fetch(
-      `${GITHUB_API}/repos/${REPO_OWNER}/${REPO_NAME}/contents/products.js`,
-      {
+
+      const putR = await fetch(`${GITHUB_API}/repos/${REPO_OWNER}/${REPO_NAME}/contents/${path}`, {
         method: 'PUT',
-        headers: {
-          'Authorization': `token ${token}`,
-          'Content-Type': 'application/json'
-        },
+        headers: { 'Authorization': `token ${token}`, 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          message: `📦 Admin Update: ${products.length} productos • ${new Date().toLocaleString()}`,
-          content: btoa(unescape(encodeURIComponent(content))),
+          message,
+          content: base64Content,
           sha,
-          committer: {
-            name: 'Amigurumis Admin',
-            email: 'admin@amigurumis.local'
-          }
+          committer: { name: 'Amigurumis Admin', email: 'admin@amigurumis.local' }
         })
+      });
+
+      if (!putR.ok) {
+        const txt = await putR.text();
+        throw new Error(`Error subiendo ${path}: ${putR.status} ${txt}`);
       }
-    );
-    
+      return await putR.json();
+    }
+
+    // Subir cada imagen que tenga data (imgsData)
+    for (const p of products) {
+      if (Array.isArray(p.imgsData) && p.imgsData.length > 0) {
+        for (const img of p.imgsData) {
+          try {
+            // img.dataUrl => data:<mime>;base64,AAAA
+            const parts = img.dataUrl.split(',');
+            const base64 = parts[1];
+            await uploadFileToRepo(img.name, base64, token, `📷 Add image ${img.name}`);
+          } catch (imgErr) {
+            console.error('Error subiendo imagen', img.name, imgErr);
+            throw imgErr;
+          }
+        }
+      }
+    }
+
+    // Preparar productos para el repo: quitar imgsData y dejar solo rutas
+    const productsForRepo = products.map(p => {
+      const copy = { ...p };
+      delete copy.imgsData;
+      return copy;
+    });
+
+    // Generar contenido del archivo products.js
+    const content = `/**\n * Catálogo de Productos - Amigurumis\n * Generado: ${new Date().toLocaleString()}\n * Total productos: ${productsForRepo.length}\n */\n\nexport const products = ${JSON.stringify(productsForRepo, null, 2)};\n`;
+
+    // Intentar obtener sha del archivo products.js (puede no existir)
+    let sha = null;
+    const getResp = await fetch(`${GITHUB_API}/repos/${REPO_OWNER}/${REPO_NAME}/contents/products.js`, { headers: { 'Authorization': `token ${token}` } });
+    if (getResp.ok) {
+      const fileData = await getResp.json();
+      sha = fileData.sha;
+    }
+
+    // Hacer commit de products.js
+    const updateResp = await fetch(`${GITHUB_API}/repos/${REPO_OWNER}/${REPO_NAME}/contents/products.js`, {
+      method: 'PUT',
+      headers: { 'Authorization': `token ${token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        message: `📦 Admin Update: ${productsForRepo.length} productos • ${new Date().toLocaleString()}`,
+        content: content ? btoa(unescape(encodeURIComponent(content))) : '',
+        sha,
+        committer: { name: 'Amigurumis Admin', email: 'admin@amigurumis.local' }
+      })
+    });
+
     if (!updateResp.ok) {
-      throw new Error(`Error en commit: ${updateResp.status}`);
+      const txt = await updateResp.text();
+      throw new Error(`Error en commit products.js: ${updateResp.status} ${txt}`);
     }
     
     showNotification('✅ ¡Publicado en GitHub! Render se actualizará en 1-2 minutos', 'success');
@@ -546,3 +597,7 @@ export const products = ${JSON.stringify(products, null, 2)};
 window.openAdminPanel = function() {
   showLoginModal();
 };
+
+// Exponer funciones para los botones inline
+window.editProduct = editProduct;
+window.deleteProduct = deleteProduct;
