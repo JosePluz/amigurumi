@@ -338,7 +338,7 @@ function loadAdminData() {
   };
 }
 
-function saveProduct() {
+async function saveProduct() {
   const id = document.getElementById('editId').value;
   const name = document.getElementById('prodName').value.trim();
   const desc = document.getElementById('prodDesc').value.trim();
