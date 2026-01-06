@@ -9,7 +9,7 @@ import compression from 'compression';
 import helmet from 'helmet';
 import cors from 'cors';
 import 'dotenv/config';
-import { readFile, writeFile } from 'fs/promises';
+import { readFile, writeFile, mkdir } from 'fs/promises';
 import { fileURLToPath } from 'url';
 import { dirname as pathDirname, join } from 'path';
 
@@ -190,6 +190,17 @@ app.post('/admin/publish', express.json({ limit: '100mb' }), async (req, res) =>
           const base64 = parts[1];
           if (!base64) continue;
           await uploadFile(img.name, base64, `📷 Add image ${img.name}`);
+          // Also write the image file locally so the running server can serve it immediately
+          try {
+            const imgPath = join(__dirname, img.name);
+            // Ensure directory exists
+            await mkdir(join(__dirname, 'img'), { recursive: true });
+            await writeFile(imgPath, Buffer.from(base64, 'base64'));
+            console.log('Wrote local image:', imgPath);
+          } catch (wfErr) {
+            console.error('Failed to write local image', img.name, wfErr);
+            // continue; not fatal
+          }
         }
       }
     }
