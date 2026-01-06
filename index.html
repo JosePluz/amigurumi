@@ -63,7 +63,7 @@
 
   <!-- Scripts -->
   <script type="module" src="products.js?v=2.0"></script>
-  <script type="module" src="admin.js?v=2.0"></script>
+  <script type="module" src="admin.js?v=2.1"></script>
   <script src="updater.js?v=2.0" defer></script>
 
   <script>
@@ -73,10 +73,10 @@
 
       const adminToggle = document.getElementById('adminToggle');
       adminToggle.addEventListener('click', async () => {
-        try {
+          try {
           if (window.openAdminPanel) return window.openAdminPanel();
           // Intentar cargar dinámicamente (fallback)
-          await import('./admin.js?v=2.0');
+          await import('./admin.js?v=2.1');
           if (window.openAdminPanel) return window.openAdminPanel();
           alert('No se pudo abrir el panel admin. Revisa la consola para más detalles.');
         } catch (err) {
