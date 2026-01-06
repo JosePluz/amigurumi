@@ -20,10 +20,10 @@
 // CONFIGURACIÓN
 // ============================================
 
-const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'admin2024'; // CAMBIAR EN RENDER
+const ADMIN_PASSWORD = (typeof process !== 'undefined' && process?.env?.ADMIN_PASSWORD) ? process.env.ADMIN_PASSWORD : 'admin2024'; // CAMBIAR EN RENDER
 const GITHUB_API = 'https://api.github.com';
-const REPO_OWNER = process.env.REPO_OWNER || 'JosePluz';
-const REPO_NAME = process.env.REPO_NAME || 'amigurumis';
+const REPO_OWNER = (typeof process !== 'undefined' && process?.env?.REPO_OWNER) ? process.env.REPO_OWNER : 'JosePluz';
+const REPO_NAME = (typeof process !== 'undefined' && process?.env?.REPO_NAME) ? process.env.REPO_NAME : 'amigurumis';
 
 // Validación de entrada
 const VALIDATION_RULES = {
