@@ -316,16 +316,38 @@ function updateCharCount(input, max) {
 
 // ============ GESTIÓN DE DATOS ============
 
-function loadAdminData() {
-  const products = window.productsData || [];
+async function loadAdminData() {
   const list = document.getElementById('adminProductList');
-  
-  if (products.length === 0) {
+  // Load published products from server and local staged products from localStorage
+  let serverProducts = [];
+  try {
+    const resp = await fetch('/api/products');
+    if (resp.ok) {
+      const d = await resp.json();
+      serverProducts = d.data || [];
+    }
+  } catch (err) {
+    console.warn('No se pudo obtener productos del servidor:', err.message);
+  }
+
+  const localProducts = JSON.parse(localStorage.getItem('adminProducts') || '[]');
+
+  // Merge: prefer localProducts if same id exists (staged edits)
+  const merged = localProducts.slice();
+  for (const sp of serverProducts) {
+    if (!merged.find(p => p.id == sp.id)) {
+      merged.push(sp);
+    }
+  }
+
+  window.productsData = merged;
+
+  if (merged.length === 0) {
     list.innerHTML = '<li style="text-align: center; color: #999;">No hay productos. Agrega uno!</li>';
     return;
   }
-  
-  list.innerHTML = products.map(p => `
+
+  list.innerHTML = merged.map(p => `
     <li>
       <div>
         <strong>${escapeHtml(p.name)}</strong>
@@ -460,27 +482,29 @@ async function saveProduct() {
 function editProduct(id) {
   try {
     console.log('editProduct called with id:', id);
-    const products = JSON.parse(localStorage.getItem('adminProducts') || '[]');
-    const product = products.find(p => p.id == id);
+    // Prefer local staged products, fallback to merged window.productsData (includes published)
+    const local = JSON.parse(localStorage.getItem('adminProducts') || '[]');
+    let product = local.find(p => p.id == id);
+    if (!product) product = (window.productsData || []).find(p => p.id == id);
     if (!product) {
       console.warn('Producto no encontrado para editar:', id);
       showNotification('❌ Producto no encontrado', 'error');
       return;
     }
-    
+
     document.getElementById('editId').value = product.id;
-    document.getElementById('prodName').value = product.name;
-    document.getElementById('prodDesc').value = product.desc;
-    document.getElementById('prodPrice').value = product.price;
+    document.getElementById('prodName').value = product.name || '';
+    document.getElementById('prodDesc').value = product.desc || '';
+    document.getElementById('prodPrice').value = product.price || '';
     document.getElementById('prodWidth').value = product.size?.width || 15;
     document.getElementById('prodHeight').value = product.size?.height || 20;
-    
+
     // Actualizar contadores
     const nameCounter = document.querySelector('[data-field="prodName"]');
     const descCounter = document.querySelector('[data-field="prodDesc"]');
-    if (nameCounter) nameCounter.textContent = `${product.name.length}/100`;
-    if (descCounter) descCounter.textContent = `${product.desc.length}/500`;
-    
+    if (nameCounter) nameCounter.textContent = `${(product.name || '').length}/100`;
+    if (descCounter) descCounter.textContent = `${(product.desc || '').length}/500`;
+
     window.scrollTo(0, 0);
     document.getElementById('prodName').focus();
     showNotification('✏️ Editando producto', 'info');
@@ -493,24 +517,26 @@ function editProduct(id) {
 function deleteProduct(id) {
   try {
     console.log('deleteProduct called with id:', id);
-    const products = JSON.parse(localStorage.getItem('adminProducts') || '[]');
-    const product = products.find(p => p.id == id);
-    
+    const local = JSON.parse(localStorage.getItem('adminProducts') || '[]');
+    let product = local.find(p => p.id == id);
+
+    // If not in local staged, it may be a published product -> delegate to deletePublishedProduct
     if (!product) {
-      console.warn('Producto no encontrado para eliminar:', id);
-      showNotification('❌ Producto no encontrado', 'error');
-      return;
+      console.warn('Producto no encontrado en local, intentando borrar publicado:', id);
+      // Ask user to confirm deletion from published site
+      if (!confirm('Este producto parece publicado. ¿Deseas eliminarlo también del sitio (GitHub)?')) return;
+      return deletePublishedProduct(id);
     }
-    
-    if (!confirm(`¿Eliminar "${escapeHtml(product.name || 'producto')}"?`)) return;
-    
-    const updated = products.filter(p => p.id != id);
+
+    if (!confirm(`¿Eliminar "${escapeHtml(product.name || 'producto')}" (local)?`)) return;
+
+    const updated = local.filter(p => p.id != id);
     localStorage.setItem('adminProducts', JSON.stringify(updated));
-    window.productsData = updated;
-    
+    window.productsData = updated.concat(((window.productsData || []).filter(p => !local.find(lp => lp.id == p.id && lp.id != id))));
+
     loadAdminData();
     if (window.renderCatalog) window.renderCatalog();
-    showNotification('🗑️ Producto eliminado', 'success');
+    showNotification('🗑️ Producto eliminado (local)', 'success');
   } catch (err) {
     console.error('deleteProduct error:', err);
     showNotification(`❌ Error al eliminar: ${err.message}`, 'error');
