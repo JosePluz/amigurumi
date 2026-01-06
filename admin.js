@@ -65,15 +65,30 @@ function showLoginModal() {
       showNotification('⚠️ Ingresa la contraseña', 'error');
       return;
     }
-    
-    if (pass === ADMIN_PASSWORD) {
+    // Validar contra servidor (preferido)
+    fetch('/admin/auth', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ password: pass })
+    }).then(r => {
+      if (r.ok) return r.json();
+      throw new Error('Unauthorized');
+    }).then(() => {
+      window._adminPass = pass;
       document.getElementById('loginModal').remove();
       showAdminPanel();
-    } else {
-      showNotification('❌ Contraseña incorrecta', 'error');
-      loginPass.value = '';
-      loginPass.focus();
-    }
+    }).catch(() => {
+      // Fallback local check
+      if (pass === ADMIN_PASSWORD) {
+        window._adminPass = pass;
+        document.getElementById('loginModal').remove();
+        showAdminPanel();
+      } else {
+        showNotification('❌ Contraseña incorrecta', 'error');
+        loginPass.value = '';
+        loginPass.focus();
+      }
+    });
   };
   
   loginBtn.onclick = attemptLogin;
@@ -482,121 +497,33 @@ function clearForm() {
 
 // ============ PUBLICAR A GITHUB ============
 async function publishToGitHub() {
-  const token = prompt(
-    '🔐 Token GitHub (con acceso a "repo")\n\n' +
-    'Cómo obtenerlo:\n' +
-    '1. github.com/settings/tokens\n' +
-    '2. "Generate new token (classic)"\n' +
-    '3. Selecciona "repo" scope\n' +
-    '4. Copy & paste aquí\n\n' +
-    '⚠️ Úsalo una sola vez, no lo guardes'
-  );
-  
-  if (!token || !token.trim()) {
-    showNotification('⚠️ Token cancelado', 'info');
-    return;
-  }
-  
   const btn = document.getElementById('publishBtn');
   btn.disabled = true;
   btn.textContent = '⏳ Publicando...';
-  
+
   try {
     const products = JSON.parse(localStorage.getItem('adminProducts') || '[]');
-    
     if (products.length === 0) {
       showNotification('⚠️ No hay productos para publicar', 'info');
       throw new Error('Empty products');
     }
-    // Primero subir imágenes (si existen) usando la API de contenidos
-    async function uploadFileToRepo(path, base64Content, token, message) {
-      // Revisar si el archivo ya existe para obtener sha
-      let sha = null;
-      const getR = await fetch(`${GITHUB_API}/repos/${REPO_OWNER}/${REPO_NAME}/contents/${path}`, {
-        headers: { 'Authorization': `token ${token}` }
-      });
-      if (getR.ok) {
-        const d = await getR.json();
-        sha = d.sha;
-      }
 
-      const putR = await fetch(`${GITHUB_API}/repos/${REPO_OWNER}/${REPO_NAME}/contents/${path}`, {
-        method: 'PUT',
-        headers: { 'Authorization': `token ${token}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          message,
-          content: base64Content,
-          sha,
-          committer: { name: 'Amigurumis Admin', email: 'admin@amigurumis.local' }
-        })
-      });
-
-      if (!putR.ok) {
-        const txt = await putR.text();
-        throw new Error(`Error subiendo ${path}: ${putR.status} ${txt}`);
-      }
-      return await putR.json();
-    }
-
-    // Subir cada imagen que tenga data (imgsData)
-    for (const p of products) {
-      if (Array.isArray(p.imgsData) && p.imgsData.length > 0) {
-        for (const img of p.imgsData) {
-          try {
-            // img.dataUrl => data:<mime>;base64,AAAA
-            const parts = img.dataUrl.split(',');
-            const base64 = parts[1];
-            await uploadFileToRepo(img.name, base64, token, `📷 Add image ${img.name}`);
-          } catch (imgErr) {
-            console.error('Error subiendo imagen', img.name, imgErr);
-            throw imgErr;
-          }
-        }
-      }
-    }
-
-    // Preparar productos para el repo: quitar imgsData y dejar solo rutas
-    const productsForRepo = products.map(p => {
-      const copy = { ...p };
-      delete copy.imgsData;
-      return copy;
+    // Send to server which will use GITHUB_TOKEN from env
+    const resp = await fetch('/admin/publish', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-admin-pass': window._adminPass || '' },
+      body: JSON.stringify({ products })
     });
 
-    // Generar contenido del archivo products.js
-    const content = `/**\n * Catálogo de Productos - Amigurumis\n * Generado: ${new Date().toLocaleString()}\n * Total productos: ${productsForRepo.length}\n */\n\nexport const products = ${JSON.stringify(productsForRepo, null, 2)};\n`;
-
-    // Intentar obtener sha del archivo products.js (puede no existir)
-    let sha = null;
-    const getResp = await fetch(`${GITHUB_API}/repos/${REPO_OWNER}/${REPO_NAME}/contents/products.js`, { headers: { 'Authorization': `token ${token}` } });
-    if (getResp.ok) {
-      const fileData = await getResp.json();
-      sha = fileData.sha;
+    if (!resp.ok) {
+      const txt = await resp.text();
+      throw new Error(txt || 'Publish failed');
     }
 
-    // Hacer commit de products.js
-    const updateResp = await fetch(`${GITHUB_API}/repos/${REPO_OWNER}/${REPO_NAME}/contents/products.js`, {
-      method: 'PUT',
-      headers: { 'Authorization': `token ${token}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        message: `📦 Admin Update: ${productsForRepo.length} productos • ${new Date().toLocaleString()}`,
-        content: content ? btoa(unescape(encodeURIComponent(content))) : '',
-        sha,
-        committer: { name: 'Amigurumis Admin', email: 'admin@amigurumis.local' }
-      })
-    });
-
-    if (!updateResp.ok) {
-      const txt = await updateResp.text();
-      throw new Error(`Error en commit products.js: ${updateResp.status} ${txt}`);
-    }
-    
     showNotification('✅ ¡Publicado en GitHub! Render se actualizará en 1-2 minutos', 'success');
+    // Only remove local copy on success
     localStorage.removeItem('adminProducts');
-    
-    setTimeout(() => {
-      location.reload();
-    }, 2000);
-    
+    setTimeout(() => location.reload(), 2000);
   } catch (err) {
     showNotification(`❌ Error: ${err.message}`, 'error');
     console.error('publishToGitHub error:', err);
