@@ -1,21 +1,21 @@
 /**
  * Catálogo de Productos - Amigurumis
- * Generado: 1/6/2026, 8:07:46 PM
+ * Generado: 1/6/2026, 8:13:20 PM
  * Total productos: 1
  */
 
 export const products = [
   {
-    "id": 1767730024845,
-    "name": "jihjij",
-    "desc": "yyguygu",
-    "price": 56363,
+    "id": 1767730380551,
+    "name": "Jsj",
+    "desc": "Jsjdj",
+    "price": 6464,
     "size": {
-      "width": 24,
-      "height": 25
+      "width": 65,
+      "height": 845
     },
     "imgs": [
-      "img/paco.webp"
+      "img/Screenshot_20251204-060943.jpg"
     ]
   }
 ];
