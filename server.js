@@ -9,7 +9,7 @@ import compression from 'compression';
 import helmet from 'helmet';
 import cors from 'cors';
 import 'dotenv/config';
-import { readFile } from 'fs/promises';
+import { readFile, writeFile } from 'fs/promises';
 import { fileURLToPath } from 'url';
 import { dirname as pathDirname, join } from 'path';
 
@@ -219,6 +219,17 @@ app.post('/admin/publish', express.json({ limit: '100mb' }), async (req, res) =>
     if (!putProd.ok) {
       const txt = await putProd.text();
       throw new Error(`Failed products commit: ${putProd.status} ${txt}`);
+    }
+
+    // Also update local data/products.json so the API reflects changes immediately
+    try {
+      const dataFile = join(__dirname, 'data', 'products.json');
+      const jsonContent = JSON.stringify({ products: productsForRepo }, null, 2);
+      await writeFile(dataFile, jsonContent, 'utf8');
+      console.log('Local data/products.json updated successfully');
+    } catch (writeErr) {
+      console.error('Failed to write local products.json:', writeErr);
+      // Not fatal: the GitHub commit succeeded, continue
     }
 
     return res.json({ success: true });
