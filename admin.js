@@ -19,11 +19,13 @@
 // ============================================
 // CONFIGURACIÓN
 // ============================================
+// Proteger acceso a `process` en navegadores donde no existe
+const process = globalThis.process || { env: {} };
 
-const ADMIN_PASSWORD = (globalThis.process && globalThis.process.env && globalThis.process.env.ADMIN_PASSWORD) ? globalThis.process.env.ADMIN_PASSWORD : 'admin2024'; // CAMBIAR EN RENDER
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'admin2024'; // CAMBIAR EN RENDER
 const GITHUB_API = 'https://api.github.com';
-const REPO_OWNER = (globalThis.process && globalThis.process.env && globalThis.process.env.REPO_OWNER) ? globalThis.process.env.REPO_OWNER : 'JosePluz';
-const REPO_NAME = (globalThis.process && globalThis.process.env && globalThis.process.env.REPO_NAME) ? globalThis.process.env.REPO_NAME : 'amigurumis';
+const REPO_OWNER = process.env.REPO_OWNER || 'JosePluz';
+const REPO_NAME = process.env.REPO_NAME || 'amigurumis';
 
 // Validación de entrada
 const VALIDATION_RULES = {
