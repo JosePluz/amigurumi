@@ -63,17 +63,28 @@
 
   <!-- Scripts -->
   <script type="module" src="products.js?v=2.0"></script>
-  <script src="admin.js?v=2.0" defer></script>
+  <script type="module" src="admin.js?v=2.0"></script>
   <script src="updater.js?v=2.0" defer></script>
-  
+
   <script>
-    // Cargar datos admin en memoria
+    // Cargar datos admin en memoria y manejar click admin de forma robusta
     document.addEventListener('DOMContentLoaded', () => {
       window.productsData = JSON.parse(localStorage.getItem('adminProducts') || '[]');
+
+      const adminToggle = document.getElementById('adminToggle');
+      adminToggle.addEventListener('click', async () => {
+        try {
+          if (window.openAdminPanel) return window.openAdminPanel();
+          // Intentar cargar dinámicamente (fallback)
+          await import('./admin.js?v=2.0');
+          if (window.openAdminPanel) return window.openAdminPanel();
+          alert('No se pudo abrir el panel admin. Revisa la consola para más detalles.');
+        } catch (err) {
+          console.error('Error al cargar admin.js:', err);
+          alert('Error al cargar panel admin. Abre la consola para ver el error.');
+        }
+      });
     });
-    
-    // Click en botón admin
-    document.getElementById('adminToggle').onclick = window.openAdminPanel;
   </script>
 </body>
 </html>
