@@ -562,9 +562,14 @@ async function publishToGitHub() {
 
 // ============ INICIALIZAR ============
 window.openAdminPanel = function() {
+  console.log('✅ openAdminPanel function ready');
   showLoginModal();
 };
 
 // Exponer funciones para los botones inline
 window.editProduct = editProduct;
 window.deleteProduct = deleteProduct;
+
+// Debug: confirmar que las funciones están expuestas
+console.log('✅ Admin.js v2.2 loaded successfully');
+console.log('✅ Functions exposed:', { editProduct: typeof window.editProduct, deleteProduct: typeof window.deleteProduct, openAdminPanel: typeof window.openAdminPanel });
