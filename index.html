@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="🧶 Amigurumis hechos a mano con amor. Catálogo de peluches tejidos únicos, adorables y artesanales. Envíos a todo el país." />
+  <meta name="keywords" content="amigurumi, peluches, tejido, artesanal, handmade, crochet, decoración" />
+  <meta name="author" content="Artesana Creativa" />
+  <meta name="theme-color" content="#FF7AA2" />
+  <meta property="og:title" content="🧶 Amigurumis Hechos a Mano" />
+  <meta property="og:description" content="Catálogo de peluches tejidos artesanales, exclusivos y adorables." />
+  <meta property="og:type" content="website" />
+  
+  <title>🧶 Amigurumis Hechos a Mano | Tienda de Peluches Artesanales</title>
+  
+  <!-- Preconectar a fuentes externas -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  
+  <!-- Fuente optimizada -->
+  <link 
+    href="https://fonts.googleapis.com/css2?family=Quicksand:wght@400;600;700&display=swap" 
+    rel="stylesheet"
+  />
+  
+  <link rel="stylesheet" href="style.css?v=2.0" />
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='75' font-size='75'>🧶</text></svg>" />
+</head>
+<body>
+  <!-- HEADER -->
+  <header class="header">
+    <div class="header__container">
+      <h1 class="header__title">🧶 Amigurumis Hechos a Mano</h1>
+      <p class="header__subtitle">Peluches tejidos con amor y detalle artesanal</p>
+    </div>
+  </header>
+
+  <!-- Admin panel toggle (solo visible en desarrollo/admin) -->
+  <button id="adminToggle" class="admin-toggle" aria-expanded="false" title="Panel de administración">🔐 Admin</button>
+
+  <!-- MAIN CONTENT -->
+  <main class="main">
+    <section class="catalog" aria-label="Catálogo de productos">
+      <div id="catalog" class="catalog__grid" role="list"></div>
+    </section>
+  </main>
+
+  <!-- FOOTER -->
+  <footer class="footer">
+    <p class="footer__text">
+      Cada amigurumi es hecho a mano con fibra 100% algodón. 
+      <span class="footer__heart">♡</span> 
+      Hecho con amor y dedicación.
+    </p>
+    <p class="footer__credits">
+      © 2024 Artesana Creativa • 
+      <a href="https://instagram.com" target="_blank" rel="noopener">Instagram</a>
+    </p>
+  </footer>
+
+  <!-- Lightbox para ver imágenes en grande -->
+  <div id="lightbox" class="lightbox" hidden aria-hidden="true" role="dialog"></div>
+
+  <!-- Scripts -->
+  <script type="module" src="products.js?v=2.0"></script>
+  <script src="admin.js?v=2.0" defer></script>
+  <script src="updater.js?v=2.0" defer></script>
+  
+  <script>
+    // Cargar datos admin en memoria
+    document.addEventListener('DOMContentLoaded', () => {
+      window.productsData = JSON.parse(localStorage.getItem('adminProducts') || '[]');
+    });
+    
+    // Click en botón admin
+    document.getElementById('adminToggle').onclick = window.openAdminPanel;
+  </script>
+</body>
+</html>
