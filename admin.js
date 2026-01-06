@@ -318,11 +318,24 @@ function loadAdminData() {
         ${p.desc ? `<small style="color: #999;">${escapeHtml(p.desc.substring(0, 50))}${p.desc.length > 50 ? '...' : ''}</small>` : ''}
       </div>
       <div>
-        <button onclick="editProduct(${p.id})" class="btn btn-sm">✏️</button>
-        <button onclick="deleteProduct(${p.id})" class="btn btn-sm btn-danger">🗑️</button>
+        <button class="btn btn-sm btn-edit" data-id="${p.id}">✏️</button>
+        <button class="btn btn-sm btn-danger btn-delete" data-id="${p.id}">🗑️</button>
       </div>
     </li>
   `).join('');
+
+  // Delegación de eventos para editar/borrar
+  list.onclick = (e) => {
+    const btn = e.target.closest('button');
+    if (!btn) return;
+    const id = btn.getAttribute('data-id');
+    if (!id) return;
+    if (btn.classList.contains('btn-edit')) {
+      editProduct(parseInt(id));
+    } else if (btn.classList.contains('btn-delete')) {
+      deleteProduct(parseInt(id));
+    }
+  };
 }
 
 function saveProduct() {
