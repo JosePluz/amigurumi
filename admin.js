@@ -170,7 +170,10 @@ function escapeHtml(text) {
 }
 
 // ============ PANEL ADMIN ============
-function showAdminPanel() {
+async function showAdminPanel() {
+  // First load data from server to show fresh published products on every open
+  await loadAdminData();
+  
   const productCount = (window.productsData || []).length;
   
   const html = `
@@ -303,9 +306,6 @@ function showAdminPanel() {
   document.getElementById('prodDesc').addEventListener('input', (e) => {
     updateCharCount(e, 500);
   });
-  
-  // Cargar datos
-  loadAdminData();
 }
 
 function updateCharCount(input, max) {

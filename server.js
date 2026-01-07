@@ -20,6 +20,34 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 
 // ============================================
+// INIT - Ensure data directory and files exist
+// ============================================
+async function initializeDataFiles() {
+  try {
+    const dataDir = join(__dirname, 'data');
+    const productsFile = join(dataDir, 'products.json');
+    
+    // Create data directory if doesn't exist
+    await mkdir(dataDir, { recursive: true });
+    
+    // Check if products.json exists, if not create it
+    try {
+      await readFile(productsFile, 'utf-8');
+      console.log('✅ data/products.json exists');
+    } catch (err) {
+      console.log('Creating data/products.json...');
+      await writeFile(productsFile, JSON.stringify({ products: [] }, null, 2), 'utf-8');
+      console.log('✅ data/products.json created');
+    }
+  } catch (err) {
+    console.error('Error initializing data files:', err);
+  }
+}
+
+// Initialize on startup
+await initializeDataFiles();
+
+// ============================================
 // MIDDLEWARES DE SEGURIDAD Y PERFORMANCE
 // ============================================
 
@@ -105,11 +133,16 @@ async function loadProducts() {
 
 /**
  * GET /api/products
- * Retorna los productos (desde data/products.json)
+ * Retorna los productos (desde data/products.json) - SIEMPRE FRESCO
  */
 app.get('/api/products', async (req, res) => {
   try {
     const products = await loadProducts();
+    res.set({
+      'Cache-Control': 'no-cache, no-store, must-revalidate, max-age=0',
+      'Pragma': 'no-cache',
+      'Expires': '0'
+    });
     res.json({ success: true, count: products.length, data: products });
   } catch (error) {
     res.status(500).json({ success: false, error: 'No se pudieron cargar los productos' });

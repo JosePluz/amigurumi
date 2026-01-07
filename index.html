@@ -62,8 +62,8 @@
   <div id="lightbox" class="lightbox" hidden aria-hidden="true" role="dialog"></div>
 
   <!-- Scripts -->
-  <script type="module" src="products.js?v=2.1"></script>
-  <script type="module" src="admin.js?v=2.2"></script>
+  <script type="module" src="products.js?v=2.2"></script>
+  <script type="module" src="admin.js?v=2.3"></script>
   <script src="updater.js?v=2.0" defer></script>
 
   <script>
@@ -82,7 +82,7 @@
           try {
           if (window.openAdminPanel) return window.openAdminPanel();
           // Intentar cargar dinámicamente (fallback)
-          await import('./admin.js?v=2.2');
+          await import('./admin.js?v=2.3');
           if (window.openAdminPanel) return window.openAdminPanel();
           alert('No se pudo abrir el panel admin. Revisa la consola para más detalles.');
         } catch (err) {
